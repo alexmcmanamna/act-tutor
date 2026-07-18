@@ -1,0 +1,121 @@
+// Prisma schema for the ACT Tutor ("Mr. Kim") app.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Student {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  goalScore      Int
+  testDate       DateTime?
+
+  // Baseline: either submitted directly, or derived from the diagnostic test.
+  hasSubmittedScore Boolean @default(false)
+  currentScore      Int?
+  englishScore      Int?
+  mathScore         Int?
+  readingScore      Int?
+  scienceScore      Int?
+
+  diagnosticCompleted Boolean @default(false)
+  onboardingComplete  Boolean @default(false)
+
+  attempts   QuestionAttempt[]
+  masteries  Mastery[]
+  plans      StudyPlan[]
+}
+
+enum Section {
+  ENGLISH
+  MATH
+  READING
+  SCIENCE
+}
+
+enum QuestionMode {
+  DIAGNOSTIC
+  PRACTICE
+}
+
+model Question {
+  id         String   @id @default(cuid())
+  section    Section
+  subtopic   String
+  difficulty Int      @default(2) // 1 (easy) - 5 (hard)
+  passage    String? // optional shared passage/context text
+  prompt     String
+  choicesJson String  // JSON-encoded string[]
+  correctIndex Int
+  explanation String
+  inDiagnostic Boolean @default(false) // included in the half-length diagnostic pool
+
+  attempts QuestionAttempt[]
+}
+
+model QuestionAttempt {
+  id         String       @id @default(cuid())
+  createdAt  DateTime     @default(now())
+  studentId  String
+  student    Student      @relation(fields: [studentId], references: [id])
+  questionId String
+  question   Question     @relation(fields: [questionId], references: [id])
+  mode       QuestionMode
+  section    Section
+  subtopic   String
+  correct    Boolean
+  selectedIndex Int
+}
+
+model Mastery {
+  id        String   @id @default(cuid())
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id])
+  section   Section
+  subtopic  String
+  score     Float    @default(0.3) // 0..1 estimated mastery
+  attempts  Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([studentId, section, subtopic])
+}
+
+model StudyPlan {
+  id        String   @id @default(cuid())
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id])
+  createdAt DateTime @default(now())
+  summary   String // Mr. Kim's generated overview text
+  weeksUntilTest Int?
+
+  items StudyPlanItem[]
+}
+
+enum PlanItemType {
+  LESSON
+  PRACTICE
+}
+
+enum PlanItemStatus {
+  PENDING
+  DONE
+}
+
+model StudyPlanItem {
+  id         String         @id @default(cuid())
+  planId     String
+  plan       StudyPlan      @relation(fields: [planId], references: [id])
+  order      Int
+  type       PlanItemType
+  section    Section
+  subtopic   String
+  title      String
+  rationale  String // why Mr. Kim assigned this
+  status     PlanItemStatus @default(PENDING)
+}
