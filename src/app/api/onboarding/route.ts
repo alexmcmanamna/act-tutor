@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { setStudentIdCookie } from "@/lib/session";
-import { generateStudyPlan } from "@/lib/studyPlan";
 
 interface OnboardingBody {
   goalScore: number;
@@ -41,18 +40,15 @@ export async function POST(req: Request) {
       mathScore: body.hasSubmittedScore ? body.mathScore ?? null : null,
       readingScore: body.hasSubmittedScore ? body.readingScore ?? null : null,
       scienceScore: body.hasSubmittedScore ? body.scienceScore ?? null : null,
-      // If they submitted a real score, we don't need the diagnostic before building a plan.
-      diagnosticCompleted: !!body.hasSubmittedScore,
-      onboardingComplete: !!body.hasSubmittedScore,
+      // The diagnostic is mandatory for every new user, even when a prior
+      // score was submitted — submitted scores only calibrate difficulty
+      // (see buildMasteryTable) and are not a substitute for the diagnostic.
+      diagnosticCompleted: false,
+      onboardingComplete: false,
     },
   });
 
   await setStudentIdCookie(student.id);
-
-  // If we already have a baseline, generate the first study plan immediately.
-  if (student.hasSubmittedScore) {
-    await generateStudyPlan(student.id);
-  }
 
   return NextResponse.json({ student });
 }

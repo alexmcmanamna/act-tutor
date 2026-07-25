@@ -9,6 +9,15 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
+  experimental: {
+    // Turbopack's persistent dev cache (.next/cache/turbopack) is a set of
+    // RocksDB-style LSM files. Since this project lives inside a
+    // OneDrive-synced folder, OneDrive's background sync can touch those
+    // files mid-write and corrupt the cache ("Failed to open database" /
+    // "invalid digit found in string" on next dev startup). Disabling it
+    // trades away some rebuild-speed for reliability in this environment.
+    turbopackFileSystemCacheForDev: false,
+  },
 };
 
 export default nextConfig;

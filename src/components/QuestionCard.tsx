@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ClientQuestion } from "@/types";
+import { playCorrectSound } from "@/lib/sounds";
 
 interface Feedback {
   correctIndex: number;
@@ -31,8 +32,16 @@ export function QuestionCard({
   selectedIndex,
 }: QuestionCardProps) {
   const [localSelected, setLocalSelected] = useState<number | null>(null);
+  const playedForRef = useRef<string | null>(null);
 
   const effectiveSelected = showFeedback ? selectedIndex ?? null : localSelected;
+
+  useEffect(() => {
+    if (showFeedback && feedback?.correct && playedForRef.current !== question.id) {
+      playedForRef.current = question.id;
+      playCorrectSound();
+    }
+  }, [showFeedback, feedback, question.id]);
 
   function handleClick(i: number) {
     if (disabled || effectiveSelected !== null) return;

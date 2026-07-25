@@ -17,6 +17,7 @@ model Student {
   testDate       DateTime?
 
   // Baseline: either submitted directly, or derived from the diagnostic test.
+  // Either way, the diagnostic itself is still mandatory before a plan is built.
   hasSubmittedScore Boolean @default(false)
   currentScore      Int?
   englishScore      Int?
@@ -27,9 +28,23 @@ model Student {
   diagnosticCompleted Boolean @default(false)
   onboardingComplete  Boolean @default(false)
 
-  attempts   QuestionAttempt[]
-  masteries  Mastery[]
-  plans      StudyPlan[]
+  // Daily goals / streaks / points (reward system).
+  points           Int      @default(0)
+  currentStreak    Int      @default(0)
+  longestStreak    Int      @default(0)
+  lastActivityDate DateTime?
+
+  // Daily reminder scaffold (opt-in; actual sending needs an email/SMS provider — see src/lib/reminders.ts).
+  reminderEmailEnabled Boolean @default(false)
+  reminderSmsEnabled   Boolean @default(false)
+  reminderEmail        String?
+  reminderPhone        String?
+  reminderTime         String  @default("18:00") // "HH:MM", local to the student
+
+  attempts     QuestionAttempt[]
+  masteries    Mastery[]
+  plans        StudyPlan[]
+  testAttempts TestAttempt[]
 }
 
 enum Section {
@@ -42,6 +57,28 @@ enum Section {
 enum QuestionMode {
   DIAGNOSTIC
   PRACTICE
+  RECALIBRATION
+  FULL_LENGTH
+}
+
+enum TestKind {
+  DIAGNOSTIC
+  RECALIBRATION
+  FULL_LENGTH
+}
+
+model TestAttempt {
+  id        String   @id @default(cuid())
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id])
+  kind      TestKind
+  createdAt DateTime @default(now())
+
+  composite    Int?
+  englishScore Int?
+  mathScore    Int?
+  readingScore Int?
+  scienceScore Int?
 }
 
 model Question {
@@ -118,4 +155,5 @@ model StudyPlanItem {
   title      String
   rationale  String // why Mr. Kim assigned this
   status     PlanItemStatus @default(PENDING)
+  scheduledFor DateTime? // which calendar day this item is slated for (daily scheduling)
 }

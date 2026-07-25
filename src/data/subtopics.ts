@@ -34,6 +34,17 @@ export const SUBTOPICS: Record<SectionKey, { key: string; label: string }[]> = {
   ],
 };
 
+// Product decision: Science is de-emphasized app-wide (lesson frequency, plan
+// weighting, visual prominence) because it counts for less toward the
+// student's target composite than English/Math/Reading, while remaining
+// fully available and gradable.
+export const SECTION_COMPOSITE_WEIGHT: Record<SectionKey, number> = {
+  ENGLISH: 1,
+  MATH: 1,
+  READING: 1,
+  SCIENCE: 0.5,
+};
+
 export function subtopicLabel(section: SectionKey, key: string): string {
   return SUBTOPICS[section].find((s) => s.key === key)?.label ?? key;
 }

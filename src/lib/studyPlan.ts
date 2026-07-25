@@ -1,8 +1,16 @@
 import { prisma } from "./prisma";
-import { SECTIONS, SUBTOPICS, sectionLabel, subtopicLabel, type SectionKey } from "@/data/subtopics";
+import { SECTIONS, SUBTOPICS, SECTION_COMPOSITE_WEIGHT, sectionLabel, subtopicLabel, type SectionKey } from "@/data/subtopics";
 import { STARTING_MASTERY } from "./adaptive";
 import { askMrKim, MR_KIM_SYSTEM_PROMPT } from "./ollama";
 import type { Student } from "@prisma/client";
+
+// Science is de-emphasized: nudge its effective mastery up before ranking so
+// it needs to be more clearly weak than English/Math/Reading to be picked as
+// a priority area, and cap how many of the weakest slots it can occupy.
+function deprioritizeBias(section: SectionKey): number {
+  return (1 - SECTION_COMPOSITE_WEIGHT[section]) * 0.3;
+}
+const MAX_SCIENCE_SLOTS = 2;
 
 export interface SubtopicMasteryEntry {
   section: SectionKey;
@@ -58,10 +66,23 @@ export async function generateStudyPlan(studentId: string) {
   const student = await prisma.student.findUniqueOrThrow({ where: { id: studentId } });
   const masteryTable = await buildMasteryTable(student);
 
-  // Weakest subtopics first; this ordering drives both plan items and Mr. Kim's summary.
-  const ranked = [...masteryTable].sort((a, b) => a.mastery - b.mastery);
-  const weakCount = Math.min(8, ranked.length);
-  const weakest = ranked.slice(0, weakCount);
+  // Weakest subtopics first (biased so Science needs to be more clearly weak
+  // to surface, since it counts for less toward the composite); this ordering
+  // drives both plan items and Mr. Kim's summary.
+  const ranked = [...masteryTable].sort(
+    (a, b) => a.mastery + deprioritizeBias(a.section) - (b.mastery + deprioritizeBias(b.section))
+  );
+
+  const weakest: SubtopicMasteryEntry[] = [];
+  let scienceSlots = 0;
+  for (const entry of ranked) {
+    if (weakest.length >= 8) break;
+    if (entry.section === "SCIENCE") {
+      if (scienceSlots >= MAX_SCIENCE_SLOTS) continue;
+      scienceSlots++;
+    }
+    weakest.push(entry);
+  }
 
   const weeks = weeksUntil(student.testDate);
 
@@ -72,12 +93,27 @@ export async function generateStudyPlan(studentId: string) {
     subtopic: string;
     title: string;
     rationale: string;
+    scheduledFor: Date;
   }[] = [];
 
+  // Daily scheduling: one lesson+practice pair per day by default, compressed
+  // to fit if the test date is sooner than that pace would allow.
+  const daysUntilTest = student.testDate
+    ? Math.max(1, Math.ceil((student.testDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : null;
+  const pairsPerDay = daysUntilTest ? Math.max(1, Math.ceil(weakest.length / daysUntilTest)) : 1;
+
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+
   let order = 0;
-  for (const entry of weakest) {
+  weakest.forEach((entry, pairIndex) => {
     const label = subtopicLabel(entry.section, entry.subtopic);
     const pct = Math.round(entry.mastery * 100);
+    const dayIndex = Math.floor(pairIndex / pairsPerDay);
+    const scheduledFor = new Date(startOfToday);
+    scheduledFor.setDate(scheduledFor.getDate() + dayIndex);
+
     items.push({
       order: order++,
       type: "LESSON",
@@ -88,6 +124,7 @@ export async function generateStudyPlan(studentId: string) {
         entry.attempts > 0
           ? `Estimated mastery is ${pct}% based on your diagnostic/practice answers — this is one of your weaker areas.`
           : `No data yet on this subtopic; starting here based on your submitted ${sectionLabel(entry.section)} score.`,
+      scheduledFor,
     });
     items.push({
       order: order++,
@@ -96,8 +133,9 @@ export async function generateStudyPlan(studentId: string) {
       subtopic: entry.subtopic,
       title: `Practice set: ${label} (${sectionLabel(entry.section)})`,
       rationale: `Targeted practice to reinforce the ${label} lesson and raise mastery above ${pct}%.`,
+      scheduledFor,
     });
-  }
+  });
 
   const summary = await generatePlanSummary(student, weakest, weeks);
 
@@ -114,6 +152,7 @@ export async function generateStudyPlan(studentId: string) {
           subtopic: i.subtopic,
           title: i.title,
           rationale: i.rationale,
+          scheduledFor: i.scheduledFor,
         })),
       },
     },

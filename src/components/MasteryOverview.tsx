@@ -7,14 +7,25 @@ function masteryColor(mastery: number): string {
   return "bg-green-500";
 }
 
+// Science is shown last and visually quieter, reflecting that it counts for
+// less toward the composite score than English/Math/Reading.
+const SECTION_ORDER = [...SECTIONS].sort((a, b) => (a.key === "SCIENCE" ? 1 : b.key === "SCIENCE" ? -1 : 0));
+
 export function MasteryOverview({ masteryTable }: { masteryTable: SubtopicMasteryEntry[] }) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      {SECTIONS.map(({ key: section, label }) => {
+      {SECTION_ORDER.map(({ key: section, label }) => {
         const rows = masteryTable.filter((m) => m.section === section);
+        const isScience = section === "SCIENCE";
         return (
-          <div key={section} className="rounded-xl border border-slate-200 bg-white p-4">
-            <h3 className="mb-3 font-semibold text-slate-800">{label}</h3>
+          <div
+            key={section}
+            className={`rounded-xl border p-4 ${isScience ? "border-slate-100 bg-slate-50/60" : "border-slate-200 bg-white"}`}
+          >
+            <h3 className={`mb-3 font-semibold ${isScience ? "text-slate-500" : "text-slate-800"}`}>
+              {label}
+              {isScience && <span className="ml-2 text-xs font-normal text-slate-400">lower composite weight</span>}
+            </h3>
             <div className="space-y-2.5">
               {rows.map((r) => (
                 <div key={r.subtopic}>
@@ -24,7 +35,7 @@ export function MasteryOverview({ masteryTable }: { masteryTable: SubtopicMaster
                   </div>
                   <div className="mastery-bar-track h-1.5 w-full overflow-hidden rounded-full">
                     <div
-                      className={`h-full rounded-full ${masteryColor(r.mastery)}`}
+                      className={`h-full rounded-full ${isScience ? "bg-slate-300" : masteryColor(r.mastery)}`}
                       style={{ width: `${Math.round(r.mastery * 100)}%` }}
                     />
                   </div>

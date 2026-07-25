@@ -1,19 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import type { ClientQuestion } from "@/types";
 import { sectionLabel, subtopicLabel } from "@/data/subtopics";
 import { QuestionCard } from "./QuestionCard";
 import { PlanBuildingOverlay } from "./PlanBuildingOverlay";
 
-interface DiagnosticQuizProps {
-  /** When set, this is a shorter recalibration diagnostic (after finishing all assigned lessons), not the initial onboarding one. */
-  mode?: "initial" | "recalibration";
-}
-
-export function DiagnosticQuiz({ mode = "initial" }: DiagnosticQuizProps) {
-  const router = useRouter();
+export function FullLengthTest() {
   const [questions, setQuestions] = useState<ClientQuestion[] | null>(null);
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
@@ -26,22 +20,22 @@ export function DiagnosticQuiz({ mode = "initial" }: DiagnosticQuizProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/diagnostic/questions")
+    fetch("/api/fulltest/questions")
       .then((r) => r.json())
       .then((data) => setQuestions(data.questions))
-      .catch(() => setError("Couldn't load the diagnostic. Try refreshing."));
+      .catch(() => setError("Couldn't load the full-length test. Try refreshing."));
   }, []);
 
   if (error) return <p className="text-red-600">{error}</p>;
-  if (!questions) return <p className="text-slate-500">Loading your diagnostic…</p>;
+  if (!questions) return <p className="text-slate-500">Loading your full-length test…</p>;
+
+  if (submitting) return <PlanBuildingOverlay active variant="scoring" />;
 
   if (done && summary) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-        <h2 className="text-2xl font-bold text-slate-900">
-          {mode === "recalibration" ? "Progress check complete!" : "Diagnostic complete!"}
-        </h2>
-        <p className="mt-2 text-slate-600">Here&apos;s your estimated baseline (a rough approximation, not an official score):</p>
+        <h2 className="text-2xl font-bold text-slate-900">Full-length test complete!</h2>
+        <p className="mt-2 text-slate-600">Here&apos;s your estimated score (a rough approximation, not an official score):</p>
         <div className="my-6 text-5xl font-bold text-indigo-600">{summary.composite ?? "—"}</div>
         <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {Object.entries(summary.sectionScores).map(([section, score]) => (
@@ -51,17 +45,12 @@ export function DiagnosticQuiz({ mode = "initial" }: DiagnosticQuizProps) {
             </div>
           ))}
         </div>
-        <button
-          onClick={() => router.push("/dashboard")}
-          className="rounded-lg bg-indigo-600 px-6 py-2.5 font-medium text-white"
-        >
-          View my study plan
-        </button>
+        <Link href="/dashboard" className="rounded-lg bg-indigo-600 px-6 py-2.5 font-medium text-white">
+          Back to dashboard
+        </Link>
       </div>
     );
   }
-
-  if (submitting) return <PlanBuildingOverlay active />;
 
   const current = questions[index];
   const progress = Math.round((index / questions.length) * 100);
@@ -69,11 +58,10 @@ export function DiagnosticQuiz({ mode = "initial" }: DiagnosticQuizProps) {
   async function submitAll(finalAnswers: Record<string, number>) {
     setSubmitting(true);
     try {
-      const res = await fetch("/api/diagnostic/submit", {
+      const res = await fetch("/api/fulltest/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          mode,
           answers: Object.entries(finalAnswers).map(([questionId, selectedIndex]) => ({ questionId, selectedIndex })),
         }),
       });
@@ -81,7 +69,7 @@ export function DiagnosticQuiz({ mode = "initial" }: DiagnosticQuizProps) {
       setSummary({ composite: data.composite, sectionScores: data.sectionScores });
       setDone(true);
     } catch {
-      setError("Couldn't submit your diagnostic. Try again.");
+      setError("Couldn't submit your test. Try again.");
     } finally {
       setSubmitting(false);
     }
@@ -113,13 +101,7 @@ export function DiagnosticQuiz({ mode = "initial" }: DiagnosticQuizProps) {
         </div>
       </div>
 
-      <QuestionCard
-        key={current.id}
-        question={current}
-        onAnswer={handleAnswer}
-        disabled={submitting}
-        showFeedback={false}
-      />
+      <QuestionCard key={current.id} question={current} onAnswer={handleAnswer} disabled={submitting} showFeedback={false} />
     </div>
   );
 }

@@ -55,6 +55,84 @@ export async function askMrKim(
   }
 }
 
+/**
+ * Streaming variant of askMrKim: returns a ReadableStream of raw text chunks
+ * (the assistant's reply, as it's generated) instead of waiting for the full
+ * response. This is the main lever for perceived latency on this local
+ * CPU-only setup — the student sees the first words in seconds instead of
+ * waiting the full (possibly 60-170s) generation time. Returns null if Ollama
+ * isn't reachable, so callers can fall back to a static message.
+ */
+export async function askMrKimStream(
+  messages: OllamaChatMessage[],
+  options?: { timeoutMs?: number; maxTokens?: number }
+): Promise<ReadableStream<Uint8Array> | null> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), options?.timeoutMs ?? 170000);
+
+  let res: Response;
+  try {
+    res = await fetch(`${OLLAMA_HOST}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        messages,
+        stream: true,
+        // With think:true, each streamed chunk's message.content already
+        // excludes reasoning (which streams separately in message.thinking),
+        // so no <think> stripping is needed here.
+        think: true,
+        options: { temperature: 0.5, num_predict: options?.maxTokens ?? 400 },
+      }),
+      signal: controller.signal,
+    });
+  } catch {
+    clearTimeout(timeout);
+    return null;
+  }
+
+  if (!res.ok || !res.body) {
+    clearTimeout(timeout);
+    return null;
+  }
+
+  // Ollama's streaming response is newline-delimited JSON, one object per
+  // token/chunk: {"message":{"role":"assistant","content":"..."},"done":false}
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
+  let buffer = "";
+
+  return new ReadableStream<Uint8Array>({
+    async pull(streamController) {
+      const { done, value } = await reader.read();
+      if (done) {
+        clearTimeout(timeout);
+        streamController.close();
+        return;
+      }
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const parsed = JSON.parse(line);
+          const content: string | undefined = parsed?.message?.content;
+          if (content) streamController.enqueue(encoder.encode(content));
+        } catch {
+          // Ignore malformed/partial line.
+        }
+      }
+    },
+    cancel() {
+      clearTimeout(timeout);
+      reader.cancel();
+    },
+  });
+}
+
 export async function isOllamaAvailable(): Promise<boolean> {
   try {
     const res = await fetch(`${OLLAMA_HOST}/api/tags`, { signal: AbortSignal.timeout(2000) });

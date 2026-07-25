@@ -3,6 +3,20 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { SECTIONS } from "@/data/subtopics";
+import { upcomingActTestDates } from "@/data/actTestDates";
+
+function toDateInputValue(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function daysAway(d: Date): number {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  return Math.round((d.getTime() - startOfToday.getTime()) / (1000 * 60 * 60 * 24));
+}
 
 type Step = 1 | 2 | 3;
 
@@ -22,7 +36,7 @@ export function OnboardingWizard() {
     SCIENCE: "",
   });
   const [testDate, setTestDate] = useState<string>("");
-  const [noTestDateYet, setNoTestDateYet] = useState(false);
+  const upcomingTestDates = upcomingActTestDates(3);
 
   const goalScoreNum = Number(goalScore);
   const currentScoreNum = Number(currentScore);
@@ -40,7 +54,7 @@ export function OnboardingWizard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           goalScore: goalScoreNum,
-          testDate: noTestDateYet || !testDate ? null : testDate,
+          testDate: testDate || null,
           hasSubmittedScore: !!hasSubmittedScore,
           currentScore: hasSubmittedScore ? currentScoreNum : null,
           englishScore: hasSubmittedScore && sectionScores.ENGLISH ? Number(sectionScores.ENGLISH) : null,
@@ -55,12 +69,9 @@ export function OnboardingWizard() {
         throw new Error(data.error ?? "Something went wrong.");
       }
 
-      const data = await res.json();
-      if (data.student.hasSubmittedScore) {
-        router.push("/dashboard");
-      } else {
-        router.push("/diagnostic");
-      }
+      // The diagnostic is mandatory for every new user, regardless of any
+      // submitted score — it's only used to calibrate difficulty.
+      router.push("/diagnostic");
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
@@ -177,21 +188,42 @@ export function OnboardingWizard() {
       {step === 3 && (
         <div className="space-y-4">
           <h2 className="text-lg font-semibold">3. When are you planning to take the ACT?</h2>
-          <input
-            type="date"
-            value={testDate}
-            disabled={noTestDateYet}
-            onChange={(e) => setTestDate(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-indigo-500 focus:outline-none disabled:bg-slate-100"
-          />
-          <label className="flex items-center gap-2 text-sm text-slate-600">
+
+          {upcomingTestDates.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-medium text-slate-500">Pick an upcoming national test date</p>
+              <div className="flex flex-wrap gap-2">
+                {upcomingTestDates.map((d) => {
+                  const value = toDateInputValue(d);
+                  const selected = testDate === value;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setTestDate(value)}
+                      className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
+                        selected
+                          ? "border-indigo-600 bg-indigo-600 text-white"
+                          : "border-slate-300 text-slate-600 hover:border-indigo-400 hover:text-indigo-600"
+                      }`}
+                    >
+                      {d.toLocaleDateString(undefined, { month: "short", day: "numeric" })} · {daysAway(d)}d
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <p className="mb-2 text-xs font-medium text-slate-500">Or enter a specific date</p>
             <input
-              type="checkbox"
-              checked={noTestDateYet}
-              onChange={(e) => setNoTestDateYet(e.target.checked)}
+              type="date"
+              value={testDate}
+              onChange={(e) => setTestDate(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-indigo-500 focus:outline-none"
             />
-            I haven&apos;t decided yet
-          </label>
+          </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -204,7 +236,7 @@ export function OnboardingWizard() {
               onClick={handleSubmit}
               className="flex-1 rounded-lg bg-indigo-600 py-2.5 font-medium text-white disabled:opacity-40"
             >
-              {submitting ? "Building your plan…" : "Finish"}
+              {submitting ? "Saving…" : "Finish"}
             </button>
           </div>
         </div>

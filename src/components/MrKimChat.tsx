@@ -5,6 +5,33 @@ import { useState } from "react";
 interface Message {
   role: "user" | "assistant";
   content: string;
+  streaming?: boolean;
+}
+
+async function streamReply(
+  message: string,
+  history: { role: "user" | "assistant"; content: string }[],
+  onChunk: (accumulated: string) => void
+) {
+  const res = await fetch("/api/mrkim/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, history }),
+  });
+  if (!res.body) {
+    onChunk(await res.text());
+    return;
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let accumulated = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    accumulated += decoder.decode(value, { stream: true });
+    onChunk(accumulated);
+  }
 }
 
 export function MrKimChat() {
@@ -21,20 +48,29 @@ export function MrKimChat() {
     const text = input.trim();
     if (!text || loading) return;
     setInput("");
-    const nextMessages: Message[] = [...messages, { role: "user", content: text }];
-    setMessages(nextMessages);
+    const history = messages.map(({ role, content }) => ({ role, content }));
+    setMessages((m) => [...m, { role: "user", content: text }, { role: "assistant", content: "", streaming: true }]);
     setLoading(true);
     try {
-      const res = await fetch("/api/mrkim/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, history: messages }),
+      await streamReply(text, history, (accumulated) => {
+        setMessages((m) => {
+          const copy = [...m];
+          copy[copy.length - 1] = { role: "assistant", content: accumulated, streaming: true };
+          return copy;
+        });
       });
-      const data = await res.json();
-      setMessages((m) => [...m, { role: "assistant", content: data.reply }]);
     } catch {
-      setMessages((m) => [...m, { role: "assistant", content: "Sorry, something went wrong reaching Mr. Kim." }]);
+      setMessages((m) => {
+        const copy = [...m];
+        copy[copy.length - 1] = { role: "assistant", content: "Sorry, something went wrong reaching Mr. Kim." };
+        return copy;
+      });
     } finally {
+      setMessages((m) => {
+        const copy = [...m];
+        copy[copy.length - 1] = { ...copy[copy.length - 1], streaming: false };
+        return copy;
+      });
       setLoading(false);
     }
   }
@@ -49,11 +85,11 @@ export function MrKimChat() {
                 m.role === "user" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-800"
               }`}
             >
-              {m.content}
+              {m.content || (m.streaming ? "…" : "")}
+              {m.streaming && m.content && <span className="ml-0.5 inline-block animate-pulse">▍</span>}
             </div>
           </div>
         ))}
-        {loading && <div className="text-sm text-slate-400">Mr. Kim is typing…</div>}
       </div>
       <div className="flex gap-2 border-t border-slate-200 p-3">
         <input

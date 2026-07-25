@@ -1,11 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useParams } from "next/navigation";
 
-export function LessonCompleteButton({ itemId }: { itemId: string | null }) {
+interface SkipToPracticeLinkProps {
+  section: string;
+  subtopic: string;
+  itemId: string | null;
+}
+
+/** The single entry point into practice from a lesson: marks the lesson's plan item done (if any), then navigates. */
+export function SkipToPracticeLink({ section, subtopic, itemId }: SkipToPracticeLinkProps) {
   const router = useRouter();
-  const params = useParams<{ section: string; subtopic: string }>();
 
   return (
     <button
@@ -17,11 +22,11 @@ export function LessonCompleteButton({ itemId }: { itemId: string | null }) {
             body: JSON.stringify({ itemId, status: "DONE" }),
           });
         }
-        router.push(`/practice/${params.section}/${params.subtopic}`);
+        router.push(`/practice/${section}/${subtopic}`);
       }}
       className="rounded-lg bg-indigo-600 px-5 py-2.5 font-medium text-white hover:bg-indigo-700"
     >
-      Got it — start practice
+      Skip to practice →
     </button>
   );
 }

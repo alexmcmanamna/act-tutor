@@ -1,10 +1,9 @@
 import { redirect, notFound } from "next/navigation";
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getStudentIdFromCookies } from "@/lib/session";
 import { getLesson, youtubeSearchUrl } from "@/data/lessons";
 import { sectionLabel, subtopicLabel, type SectionKey } from "@/data/subtopics";
-import { LessonCompleteButton } from "@/components/LessonCompleteButton";
+import { SkipToPracticeLink } from "@/components/SkipToPracticeLink";
 import { MrKimInlineHelp } from "@/components/MrKimInlineHelp";
 
 export default async function LessonPage({
@@ -66,13 +65,7 @@ export default async function LessonPage({
       </div>
 
       <div className="mt-6 flex items-center gap-3">
-        <LessonCompleteButton itemId={planItem?.id ?? null} />
-        <Link
-          href={`/practice/${section}/${subtopic}`}
-          className="rounded-lg border border-slate-300 px-5 py-2.5 font-medium text-slate-600 hover:border-indigo-400 hover:text-indigo-600"
-        >
-          Skip to practice →
-        </Link>
+        <SkipToPracticeLink section={section} subtopic={subtopic} itemId={planItem?.id ?? null} />
       </div>
     </div>
   );

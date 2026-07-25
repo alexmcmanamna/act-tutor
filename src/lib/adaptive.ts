@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import type { Section } from "@prisma/client";
+import { recordActivityAndAwardPoints } from "./gamification";
 
 const BASE_LEARNING_RATE = 0.22;
 const STARTING_MASTERY = 0.3;
@@ -56,6 +57,8 @@ export async function recordAttemptAndUpdateMastery(params: {
       attempts: { increment: 1 },
     },
   });
+
+  await recordActivityAndAwardPoints(studentId, correct);
 
   return updated;
 }
