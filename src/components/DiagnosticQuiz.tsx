@@ -52,7 +52,10 @@ export function DiagnosticQuiz({ mode = "initial" }: DiagnosticQuizProps) {
           ))}
         </div>
         <button
-          onClick={() => router.push("/dashboard")}
+          onClick={() => {
+            router.push("/dashboard");
+            router.refresh();
+          }}
           className="rounded-lg bg-indigo-600 px-6 py-2.5 font-medium text-white"
         >
           View my study plan
@@ -80,6 +83,11 @@ export function DiagnosticQuiz({ mode = "initial" }: DiagnosticQuizProps) {
       const data = await res.json();
       setSummary({ composite: data.composite, sectionScores: data.sectionScores });
       setDone(true);
+      // The student's onboardingComplete/diagnosticCompleted flags just flipped
+      // server-side, which changes what the root layout's NavBar renders (the
+      // persistent chips). Invalidate the router cache now so the dashboard
+      // navigation below doesn't reuse the stale, pre-diagnostic layout.
+      router.refresh();
     } catch {
       setError("Couldn't submit your diagnostic. Try again.");
     } finally {

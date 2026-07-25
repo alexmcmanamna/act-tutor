@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { ClientQuestion } from "@/types";
 import { QuestionCard } from "./QuestionCard";
 import { MrKimInlineHelp } from "./MrKimInlineHelp";
@@ -46,6 +47,7 @@ function PracticeSessionInner({
   const [correctCount, setCorrectCount] = useState(0);
   const [finished, setFinished] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     fetch(`/api/practice/questions?section=${section}&subtopic=${subtopic}&limit=5`)
@@ -106,6 +108,9 @@ function PracticeSessionInner({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ itemId: planItemId, status: "DONE" }),
         });
+        // So the "Back to dashboard" link below doesn't land on a stale
+        // cached layout/page still showing this item as pending.
+        router.refresh();
       }
       setFinished(true);
     }

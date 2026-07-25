@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import type { StudyPlanItem } from "@prisma/client";
 
 export function PlanItemList({ items }: { items: StudyPlanItem[] }) {
+  const router = useRouter();
   const [localItems, setLocalItems] = useState(items);
 
   async function toggle(item: StudyPlanItem) {
@@ -15,6 +17,10 @@ export function PlanItemList({ items }: { items: StudyPlanItem[] }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ itemId: item.id, status: nextStatus }),
     });
+    // Keeps the "today's goal"/streak widgets and the NavBar's calendar chip
+    // (this week x/y) in sync with the change instead of only updating this
+    // checkbox locally.
+    router.refresh();
   }
 
   return (

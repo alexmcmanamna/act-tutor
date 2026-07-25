@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { ClientQuestion } from "@/types";
 import { sectionLabel, subtopicLabel } from "@/data/subtopics";
 import { QuestionCard } from "./QuestionCard";
 import { PlanBuildingOverlay } from "./PlanBuildingOverlay";
 
 export function FullLengthTest() {
+  const router = useRouter();
   const [questions, setQuestions] = useState<ClientQuestion[] | null>(null);
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
@@ -68,6 +70,8 @@ export function FullLengthTest() {
       const data = await res.json();
       setSummary({ composite: data.composite, sectionScores: data.sectionScores });
       setDone(true);
+      // Points/mastery updated server-side; refresh so "Back to dashboard" doesn't land on stale cached data.
+      router.refresh();
     } catch {
       setError("Couldn't submit your test. Try again.");
     } finally {
