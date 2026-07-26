@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getStudentIdFromCookies } from "@/lib/session";
 import { StartOverButton } from "./StartOverButton";
 import { PlanCalendarChip, type CalendarPlanItem } from "./PlanCalendarChip";
+import { Logo } from "./Logo";
 
 export async function NavBar() {
   const studentId = await getStudentIdFromCookies();
@@ -78,6 +79,12 @@ export async function NavBar() {
             <Link href="/dashboard" className="hover:text-indigo-600">
               Dashboard
             </Link>
+            <Link href="/progress" className="hover:text-indigo-600">
+              Progress
+            </Link>
+            <Link href="/history" className="hover:text-indigo-600">
+              History
+            </Link>
             <Link href="/mr-kim" className="hover:text-indigo-600">
               Ask Mr. Kim
             </Link>
@@ -87,6 +94,8 @@ export async function NavBar() {
             <StartOverButton />
           </nav>
         )}
+
+        <Logo className="h-8 w-8 flex-shrink-0" />
       </div>
     </header>
   );

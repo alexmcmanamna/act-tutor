@@ -8,6 +8,7 @@ export default async function Home() {
   const student = studentId ? await prisma.student.findUnique({ where: { id: studentId } }) : null;
 
   if (student) {
+    if (student.onboardingComplete && !student.tourCompleted) redirect("/onboarding/reveal");
     if (student.onboardingComplete) redirect("/dashboard");
     redirect("/diagnostic");
   }

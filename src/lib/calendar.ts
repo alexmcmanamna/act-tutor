@@ -2,6 +2,11 @@ export function isSameCalendarDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
+/** Whether `date` is at or before now. Kept as a plain helper (not inlined into components) so the impure `Date.now()` read doesn't happen directly in render. */
+export function isDueNow(date: Date | null): boolean {
+  return !!date && date.getTime() <= Date.now();
+}
+
 export function startOfWeek(d: Date): Date {
   const out = new Date(d);
   out.setHours(0, 0, 0, 0);

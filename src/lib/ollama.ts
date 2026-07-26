@@ -13,12 +13,17 @@ interface OllamaChatMessage {
  */
 export async function askMrKim(
   messages: OllamaChatMessage[],
-  options?: { timeoutMs?: number; maxTokens?: number }
+  options?: { timeoutMs?: number; maxTokens?: number; signal?: AbortSignal }
 ): Promise<string | null> {
   const controller = new AbortController();
   // Local CPU inference is slow on this hardware (no GPU, ~3 tokens/sec); give it
   // plenty of room before falling back to static content.
   const timeout = setTimeout(() => controller.abort(), options?.timeoutMs ?? 170000);
+  // If the caller's own request was cancelled (e.g. the user navigated away
+  // mid-lesson), abort this call too — otherwise the single-threaded local
+  // Ollama server keeps grinding on stale requests, queueing up behind them
+  // and starving the next real request for minutes.
+  options?.signal?.addEventListener("abort", () => controller.abort());
 
   try {
     const res = await fetch(`${OLLAMA_HOST}/api/chat`, {

@@ -7,7 +7,11 @@ export async function POST(req: Request) {
   const studentId = await getStudentIdFromCookies();
   if (!studentId) return NextResponse.json({ error: "No active student session." }, { status: 401 });
 
-  const { questionId, selectedIndex } = (await req.json()) as { questionId: string; selectedIndex: number };
+  const { questionId, selectedIndex, sessionId } = (await req.json()) as {
+    questionId: string;
+    selectedIndex: number;
+    sessionId?: string;
+  };
 
   const question = await prisma.question.findUnique({ where: { id: questionId } });
   if (!question) return NextResponse.json({ error: "Question not found." }, { status: 404 });
@@ -23,6 +27,7 @@ export async function POST(req: Request) {
       subtopic: question.subtopic,
       correct,
       selectedIndex,
+      ...(sessionId ? { sessionId } : {}),
     },
   });
 

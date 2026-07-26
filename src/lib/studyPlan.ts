@@ -62,6 +62,113 @@ export function weeksUntil(testDate: Date | null): number | null {
   return Math.max(1, Math.round(ms / (1000 * 60 * 60 * 24 * 7)));
 }
 
+/**
+ * Spreads `pairCount` lesson+practice pairs across days at the student's
+ * chosen weekly cadence (e.g. 5/wk ≈ one every 1.4 days), compressing evenly
+ * if that pace wouldn't fit before the test date.
+ */
+function buildScheduleDates(pairCount: number, studyDaysPerWeek: number, daysUntilTest: number | null): Date[] {
+  const spacingDays = 7 / Math.max(1, Math.min(7, studyDaysPerWeek));
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+
+  const rawOffsets = Array.from({ length: pairCount }, (_, i) => i * spacingDays);
+  const lastOffset = rawOffsets[rawOffsets.length - 1] ?? 0;
+  const compression = daysUntilTest != null && lastOffset > daysUntilTest && lastOffset > 0 ? daysUntilTest / lastOffset : 1;
+
+  return rawOffsets.map((offset) => {
+    const d = new Date(startOfToday);
+    d.setDate(d.getDate() + Math.round(offset * compression));
+    return d;
+  });
+}
+
+interface PlanItemDraft {
+  order: number;
+  type: "LESSON" | "PRACTICE";
+  section: SectionKey;
+  subtopic: string;
+  title: string;
+  rationale: string;
+  scheduledFor: Date;
+}
+
+function draftPairsFromEntries(entries: SubtopicMasteryEntry[], studyDaysPerWeek: number, daysUntilTest: number | null, rationaleFor: (e: SubtopicMasteryEntry) => string): PlanItemDraft[] {
+  const dates = buildScheduleDates(entries.length, studyDaysPerWeek, daysUntilTest);
+  const items: PlanItemDraft[] = [];
+  let order = 0;
+  entries.forEach((entry, i) => {
+    const label = subtopicLabel(entry.section, entry.subtopic);
+    const scheduledFor = dates[i];
+    items.push({
+      order: order++,
+      type: "LESSON",
+      section: entry.section,
+      subtopic: entry.subtopic,
+      title: `Lesson: ${label} (${sectionLabel(entry.section)})`,
+      rationale: rationaleFor(entry),
+      scheduledFor,
+    });
+    items.push({
+      order: order++,
+      type: "PRACTICE",
+      section: entry.section,
+      subtopic: entry.subtopic,
+      title: `Practice set: ${label} (${sectionLabel(entry.section)})`,
+      rationale: `Targeted practice to reinforce the ${label} lesson.`,
+      scheduledFor,
+    });
+  });
+  return items;
+}
+
+/**
+ * Round-1 plan: a fixed foundational sequence covering EVERY question type in
+ * every section, regardless of diagnostic score — what it is and what the
+ * student needs to know to solve it. Ordered weakest-first (with Science
+ * de-emphasized in ordering, not excluded) so the earliest days target the
+ * biggest gaps, but nothing is skipped.
+ */
+export async function generateFoundationPlan(studentId: string) {
+  const student = await prisma.student.findUniqueOrThrow({ where: { id: studentId } });
+  const masteryTable = await buildMasteryTable(student);
+
+  const ordered = [...masteryTable].sort(
+    (a, b) => a.mastery + deprioritizeBias(a.section) - (b.mastery + deprioritizeBias(b.section))
+  );
+
+  const daysUntilTest = student.testDate
+    ? Math.max(1, Math.ceil((student.testDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : null;
+
+  const items = draftPairsFromEntries(ordered, student.studyDaysPerWeek, daysUntilTest, (entry) => {
+    const pct = Math.round(entry.mastery * 100);
+    return `Round 1 foundations: every ACT question type gets covered here, starting with ${subtopicLabel(entry.section, entry.subtopic)} (~${pct}% estimated mastery).`;
+  });
+
+  const weeks = weeksUntil(student.testDate);
+  const summary = await generatePlanSummary(student, ordered.slice(0, 5), weeks, true);
+
+  const plan = await prisma.studyPlan.create({
+    data: {
+      studentId: student.id,
+      summary,
+      weeksUntilTest: weeks,
+      items: {
+        create: items.map((i) => ({ ...i, round: 1 })),
+      },
+    },
+    include: { items: true },
+  });
+
+  return plan;
+}
+
+/**
+ * Round 2+ plan: targeted at the newly identified weakest subtopics (top 8,
+ * Science capped) after a test/diagnostic, same as before but tagged with the
+ * current round number and paced at the student's weekly cadence.
+ */
 export async function generateStudyPlan(studentId: string) {
   const student = await prisma.student.findUniqueOrThrow({ where: { id: studentId } });
   const masteryTable = await buildMasteryTable(student);
@@ -85,59 +192,18 @@ export async function generateStudyPlan(studentId: string) {
   }
 
   const weeks = weeksUntil(student.testDate);
-
-  const items: {
-    order: number;
-    type: "LESSON" | "PRACTICE";
-    section: SectionKey;
-    subtopic: string;
-    title: string;
-    rationale: string;
-    scheduledFor: Date;
-  }[] = [];
-
-  // Daily scheduling: one lesson+practice pair per day by default, compressed
-  // to fit if the test date is sooner than that pace would allow.
   const daysUntilTest = student.testDate
     ? Math.max(1, Math.ceil((student.testDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : null;
-  const pairsPerDay = daysUntilTest ? Math.max(1, Math.ceil(weakest.length / daysUntilTest)) : 1;
 
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-
-  let order = 0;
-  weakest.forEach((entry, pairIndex) => {
-    const label = subtopicLabel(entry.section, entry.subtopic);
+  const items = draftPairsFromEntries(weakest, student.studyDaysPerWeek, daysUntilTest, (entry) => {
     const pct = Math.round(entry.mastery * 100);
-    const dayIndex = Math.floor(pairIndex / pairsPerDay);
-    const scheduledFor = new Date(startOfToday);
-    scheduledFor.setDate(scheduledFor.getDate() + dayIndex);
-
-    items.push({
-      order: order++,
-      type: "LESSON",
-      section: entry.section,
-      subtopic: entry.subtopic,
-      title: `Lesson: ${label} (${sectionLabel(entry.section)})`,
-      rationale:
-        entry.attempts > 0
-          ? `Estimated mastery is ${pct}% based on your diagnostic/practice answers — this is one of your weaker areas.`
-          : `No data yet on this subtopic; starting here based on your submitted ${sectionLabel(entry.section)} score.`,
-      scheduledFor,
-    });
-    items.push({
-      order: order++,
-      type: "PRACTICE",
-      section: entry.section,
-      subtopic: entry.subtopic,
-      title: `Practice set: ${label} (${sectionLabel(entry.section)})`,
-      rationale: `Targeted practice to reinforce the ${label} lesson and raise mastery above ${pct}%.`,
-      scheduledFor,
-    });
+    return entry.attempts > 0
+      ? `Estimated mastery is ${pct}% based on your diagnostic/practice answers — this is one of your weaker areas.`
+      : `No data yet on this subtopic; starting here based on your submitted ${sectionLabel(entry.section)} score.`;
   });
 
-  const summary = await generatePlanSummary(student, weakest, weeks);
+  const summary = await generatePlanSummary(student, weakest, weeks, false);
 
   const plan = await prisma.studyPlan.create({
     data: {
@@ -145,15 +211,7 @@ export async function generateStudyPlan(studentId: string) {
       summary,
       weeksUntilTest: weeks,
       items: {
-        create: items.map((i) => ({
-          order: i.order,
-          type: i.type,
-          section: i.section,
-          subtopic: i.subtopic,
-          title: i.title,
-          rationale: i.rationale,
-          scheduledFor: i.scheduledFor,
-        })),
+        create: items.map((i) => ({ ...i, round: student.currentRound })),
       },
     },
     include: { items: true },
@@ -165,7 +223,8 @@ export async function generateStudyPlan(studentId: string) {
 async function generatePlanSummary(
   student: Student,
   weakest: SubtopicMasteryEntry[],
-  weeks: number | null
+  weeks: number | null,
+  isFoundationRound: boolean
 ): Promise<string> {
   const weakList = weakest
     .slice(0, 5)
@@ -176,9 +235,9 @@ async function generatePlanSummary(
 Goal composite score: ${student.goalScore}
 Current/baseline composite score: ${student.currentScore ?? "unknown, estimated from diagnostic"}
 Test date: ${student.testDate ? student.testDate.toDateString() : "not set"}${weeks ? ` (${weeks} weeks away)` : ""}
-Weakest areas identified: ${weakList}
+${isFoundationRound ? "This is round 1: a fixed foundational sequence covering every ACT question type in every section, ordered so their weakest areas come first" : "Weakest areas identified"}: ${weakList}
 
-Write a short (3-4 sentence), encouraging study plan overview addressed directly to the student, mentioning their goal score and the top couple of weak areas you'll focus on first. Do not use markdown headers or bullet lists, just plain prose.`;
+Write a short (3-4 sentence), encouraging study plan overview addressed directly to the student, mentioning their goal score${isFoundationRound ? " and that you'll build the fundamentals across every section before specializing" : " and the top couple of weak areas you'll focus on first"}. Do not use markdown headers or bullet lists, just plain prose.`;
 
   const aiResponse = await askMrKim([
     { role: "system", content: MR_KIM_SYSTEM_PROMPT },
@@ -187,7 +246,11 @@ Write a short (3-4 sentence), encouraging study plan overview addressed directly
 
   if (aiResponse) return aiResponse;
 
-  return `Welcome! Based on your baseline, I've built a plan to help you close the gap to your goal score of ${student.goalScore}${
+  if (isFoundationRound) {
+    return `Welcome! We'll start with round 1: a foundational lesson on every ACT question type across English, Math, Reading, and Science, sequenced so your weakest areas — ${weakList} — come first. Once you're through this round, we'll check your progress and target round 2 at exactly what you still need. (Note: Mr. Kim's AI commentary is using a fallback message right now because the local Ollama server wasn't reachable — your plan itself is still fully personalized to your data.)`;
+  }
+
+  return `Welcome back! Based on your latest results, I've built a plan to help you close the gap to your goal score of ${student.goalScore}${
     weeks ? ` before your test in about ${weeks} week${weeks === 1 ? "" : "s"}` : ""
   }. We'll start with your weakest areas — ${weakList} — pairing a short lesson with targeted practice for each, then keep adapting as you go. (Note: Mr. Kim's AI commentary is using a fallback message right now because the local Ollama server wasn't reachable — your plan itself is still fully personalized to your data.)`;
 }

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getStudentIdFromCookies } from "@/lib/session";
 import { buildMasteryTable, weeksUntil } from "@/lib/studyPlan";
+import { isDueNow } from "@/lib/calendar";
 import { getDailyGoal, computeBadges } from "@/lib/gamification";
 import { MasteryOverview } from "@/components/MasteryOverview";
 import { PlanItemList } from "@/components/PlanItemList";
@@ -28,8 +29,11 @@ export default async function DashboardPage() {
   ]);
 
   const weeksAway = weeksUntil(student.testDate);
-  const planFullyDone = !!plan && plan.items.length > 0 && plan.items.every((i) => i.status === "DONE");
+  const roundItems = plan?.items.filter((i) => i.round === student.currentRound) ?? [];
+  const roundFullyDone = roundItems.length > 0 && roundItems.every((i) => i.status === "DONE");
   const badges = computeBadges(student, totalAttempts).filter((b) => b.earned);
+
+  const assessmentDue = !!student.roundAssessmentType && isDueNow(student.roundAssessmentScheduledFor);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
@@ -45,14 +49,31 @@ export default async function DashboardPage() {
         <RegeneratePlanButton />
       </div>
 
-      {planFullyDone && (
+      {assessmentDue && (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-200 bg-indigo-50 p-5">
+          <div>
+            <p className="font-semibold text-indigo-800">
+              Your scheduled {student.roundAssessmentType === "FULL_LENGTH" ? "full-length test" : "diagnostic"} is ready.
+            </p>
+            <p className="text-sm text-indigo-700">Mr. Kim wants to see how round {student.currentRound} paid off.</p>
+          </div>
+          <Link
+            href={student.roundAssessmentType === "FULL_LENGTH" ? "/full-test" : "/diagnostic?mode=recalibration"}
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+          >
+            Take it now
+          </Link>
+        </div>
+      )}
+
+      {!assessmentDue && roundFullyDone && (
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-green-200 bg-green-50 p-5">
           <div>
-            <p className="font-semibold text-green-800">You&apos;ve finished every item in your plan! 🎉</p>
-            <p className="text-sm text-green-700">Take a half-length progress check to see how far you&apos;ve come and get a fresh plan.</p>
+            <p className="font-semibold text-green-800">You&apos;ve finished round {student.currentRound}! 🎉</p>
+            <p className="text-sm text-green-700">Let&apos;s check your progress and unlock the next round.</p>
           </div>
-          <Link href="/diagnostic?mode=recalibration" className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">
-            Take progress check
+          <Link href="/round-complete" className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">
+            Continue
           </Link>
         </div>
       )}
@@ -108,7 +129,9 @@ export default async function DashboardPage() {
       </div>
 
       <div>
-        <h2 className="mb-3 text-lg font-semibold text-slate-900">Your study plan</h2>
+        <h2 className="mb-3 text-lg font-semibold text-slate-900">
+          Your study plan <span className="font-normal text-slate-400">· Round {student.currentRound}</span>
+        </h2>
         {plan ? (
           <PlanItemList items={plan.items} />
         ) : (

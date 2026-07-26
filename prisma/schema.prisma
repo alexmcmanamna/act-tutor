@@ -28,6 +28,26 @@ model Student {
   diagnosticCompleted Boolean @default(false)
   onboardingComplete  Boolean @default(false)
 
+  // Scheduling inputs, captured during onboarding, used for daily/weekly plan
+  // pacing and the goal-realism feasibility check.
+  studyDaysPerWeek  Int      @default(5)
+  minutesPerSession Int      @default(30)
+  preferredSection  Section?
+
+  // Post-diagnostic onboarding sequence (reveal -> tour -> skill polygons ->
+  // question-type choice -> goal check) — gates whether "/" redirects into
+  // that sequence or straight to the dashboard.
+  tourCompleted             Boolean  @default(false)
+  explainQuestionTypesFirst Boolean?
+  goalRealismAcknowledged   Boolean  @default(false)
+
+  // Lesson-round cycle: round 1 is the fixed foundational sequence; round 2+
+  // are targeted at newly-identified weak points after each test/diagnostic.
+  currentRound                Int       @default(1)
+  roundAssessmentType         TestKind?
+  roundAssessmentScheduledFor DateTime?
+  roundFollowUpPending        Boolean   @default(false)
+
   // Daily goals / streaks / points (reward system).
   points           Int      @default(0)
   currentStreak    Int      @default(0)
@@ -108,6 +128,10 @@ model QuestionAttempt {
   subtopic   String
   correct    Boolean
   selectedIndex Int
+  // Groups attempts made together into one "session" for the History tab —
+  // one id per diagnostic/full-length submission batch, or per practice-set
+  // component mount.
+  sessionId  String       @default(cuid())
 }
 
 model Mastery {
@@ -156,4 +180,5 @@ model StudyPlanItem {
   rationale  String // why Mr. Kim assigned this
   status     PlanItemStatus @default(PENDING)
   scheduledFor DateTime? // which calendar day this item is slated for (daily scheduling)
+  round        Int      @default(1) // 1 = fixed foundational round; 2+ = targeted at weak points
 }

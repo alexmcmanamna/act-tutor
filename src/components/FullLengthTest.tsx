@@ -68,10 +68,24 @@ export function FullLengthTest() {
         }),
       });
       const data = await res.json();
-      setSummary({ composite: data.composite, sectionScores: data.sectionScores });
-      setDone(true);
       // Points/mastery updated server-side; refresh so "Back to dashboard" doesn't land on stale cached data.
       router.refresh();
+
+      if (data.roundTransition) {
+        sessionStorage.setItem(
+          "round-followup",
+          JSON.stringify({
+            previousComposite: data.previousComposite,
+            newComposite: data.composite,
+            roundNumber: data.roundNumber,
+          })
+        );
+        router.push("/round-followup");
+        return;
+      }
+
+      setSummary({ composite: data.composite, sectionScores: data.sectionScores });
+      setDone(true);
     } catch {
       setError("Couldn't submit your test. Try again.");
     } finally {

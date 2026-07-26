@@ -48,6 +48,7 @@ function PracticeSessionInner({
   const [finished, setFinished] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
+  const [sessionId] = useState(() => crypto.randomUUID());
 
   useEffect(() => {
     fetch(`/api/practice/questions?section=${section}&subtopic=${subtopic}&limit=5`)
@@ -86,7 +87,7 @@ function PracticeSessionInner({
       const res = await fetch("/api/practice/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ questionId: current.id, selectedIndex: i }),
+        body: JSON.stringify({ questionId: current.id, selectedIndex: i, sessionId }),
       });
       const data = await res.json();
       setFeedback({ correctIndex: data.correctIndex, explanation: data.explanation, correct: data.correct });

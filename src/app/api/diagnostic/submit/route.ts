@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getStudentIdFromCookies } from "@/lib/session";
 import { recordAttemptAndUpdateMastery } from "@/lib/adaptive";
-import { generateStudyPlan } from "@/lib/studyPlan";
+import { generateStudyPlan, generateFoundationPlan } from "@/lib/studyPlan";
 import type { Section } from "@prisma/client";
+import { randomUUID } from "crypto";
 
 interface SubmitBody {
   mode?: "initial" | "recalibration";
@@ -36,6 +37,7 @@ export async function POST(req: Request) {
   const sectionTotal: Record<Section, number> = { ENGLISH: 0, MATH: 0, READING: 0, SCIENCE: 0 };
 
   const results: { questionId: string; correct: boolean; correctIndex: number; explanation: string }[] = [];
+  const sessionId = randomUUID();
 
   for (const answer of body.answers) {
     const question = questionMap.get(answer.questionId);
@@ -54,6 +56,7 @@ export async function POST(req: Request) {
         subtopic: question.subtopic,
         correct,
         selectedIndex: answer.selectedIndex,
+        sessionId,
       },
     });
 
@@ -116,7 +119,45 @@ export async function POST(req: Request) {
     },
   });
 
-  const plan = await generateStudyPlan(studentId);
+  // The very first diagnostic seeds round 1: a fixed foundational sequence
+  // covering every question type, regardless of score. A recalibration
+  // diagnostic only represents a round transition when it was launched from
+  // the "round complete" screen (roundAssessmentType set to RECALIBRATION);
+  // otherwise (e.g. re-run manually) it just refreshes mastery data.
+  let plan;
+  let roundTransition = false;
+  let previousComposite: number | null = null;
+  let roundNumber = updated.currentRound;
 
-  return NextResponse.json({ student: updated, plan, results, sectionScores, composite });
+  if (!isRecalibration) {
+    plan = await generateFoundationPlan(studentId);
+  } else if (updated.roundAssessmentType === "RECALIBRATION") {
+    const priorAttempts = await prisma.testAttempt.findMany({
+      where: { studentId, kind: { in: ["DIAGNOSTIC", "RECALIBRATION", "FULL_LENGTH"] } },
+      orderBy: { createdAt: "desc" },
+      take: 2,
+    });
+    previousComposite = priorAttempts[1]?.composite ?? null;
+
+    roundNumber = updated.currentRound + 1;
+    await prisma.student.update({
+      where: { id: studentId },
+      data: { currentRound: roundNumber, roundAssessmentType: null, roundAssessmentScheduledFor: null, roundFollowUpPending: true },
+    });
+    plan = await generateStudyPlan(studentId);
+    roundTransition = true;
+  } else {
+    plan = await generateStudyPlan(studentId);
+  }
+
+  return NextResponse.json({
+    student: updated,
+    plan,
+    results,
+    sectionScores,
+    composite,
+    roundTransition,
+    previousComposite,
+    roundNumber,
+  });
 }

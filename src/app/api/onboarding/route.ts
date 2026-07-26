@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { setStudentIdCookie } from "@/lib/session";
+import type { Section } from "@prisma/client";
 
 interface OnboardingBody {
   goalScore: number;
@@ -11,6 +12,9 @@ interface OnboardingBody {
   mathScore?: number | null;
   readingScore?: number | null;
   scienceScore?: number | null;
+  studyDaysPerWeek?: number;
+  minutesPerSession?: number;
+  preferredSection?: Section | null;
 }
 
 function validScore(n: unknown): n is number {
@@ -40,6 +44,9 @@ export async function POST(req: Request) {
       mathScore: body.hasSubmittedScore ? body.mathScore ?? null : null,
       readingScore: body.hasSubmittedScore ? body.readingScore ?? null : null,
       scienceScore: body.hasSubmittedScore ? body.scienceScore ?? null : null,
+      studyDaysPerWeek: body.studyDaysPerWeek && body.studyDaysPerWeek >= 1 && body.studyDaysPerWeek <= 7 ? body.studyDaysPerWeek : 5,
+      minutesPerSession: body.minutesPerSession && body.minutesPerSession >= 5 ? body.minutesPerSession : 30,
+      preferredSection: body.preferredSection ?? null,
       // The diagnostic is mandatory for every new user, even when a prior
       // score was submitted — submitted scores only calibrate difficulty
       // (see buildMasteryTable) and are not a substitute for the diagnostic.

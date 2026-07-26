@@ -81,13 +81,38 @@ export function DiagnosticQuiz({ mode = "initial" }: DiagnosticQuizProps) {
         }),
       });
       const data = await res.json();
-      setSummary({ composite: data.composite, sectionScores: data.sectionScores });
-      setDone(true);
       // The student's onboardingComplete/diagnosticCompleted flags just flipped
       // server-side, which changes what the root layout's NavBar renders (the
-      // persistent chips). Invalidate the router cache now so the dashboard
-      // navigation below doesn't reuse the stale, pre-diagnostic layout.
+      // persistent chips). Invalidate the router cache now so subsequent
+      // navigation doesn't reuse the stale, pre-diagnostic layout.
       router.refresh();
+
+      if (mode === "initial") {
+        // The very first diagnostic feeds the reveal -> tour -> skill polygons
+        // -> goal-check onboarding sequence instead of landing on the dashboard.
+        sessionStorage.setItem(
+          "onboarding-diagnostic-result",
+          JSON.stringify({ composite: data.composite, sectionScores: data.sectionScores })
+        );
+        router.push("/onboarding/reveal");
+        return;
+      }
+
+      if (data.roundTransition) {
+        sessionStorage.setItem(
+          "round-followup",
+          JSON.stringify({
+            previousComposite: data.previousComposite,
+            newComposite: data.composite,
+            roundNumber: data.roundNumber,
+          })
+        );
+        router.push("/round-followup");
+        return;
+      }
+
+      setSummary({ composite: data.composite, sectionScores: data.sectionScores });
+      setDone(true);
     } catch {
       setError("Couldn't submit your diagnostic. Try again.");
     } finally {
