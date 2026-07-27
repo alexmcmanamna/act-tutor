@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { MrKimMessageCard } from "./MrKimMessageCard";
 
-export function RoundCompleteClient({ message, roundNumber }: { message: string; roundNumber: number }) {
+export function RoundCompleteClient({ roundNumber }: { roundNumber: number }) {
   const router = useRouter();
   const [scheduledFor, setScheduledFor] = useState("");
   const [loading, setLoading] = useState<string | null>(null);
@@ -33,7 +34,7 @@ export function RoundCompleteClient({ message, roundNumber }: { message: string;
 
       <div className="mb-6 rounded-2xl border border-indigo-100 bg-indigo-50 p-6 text-left">
         <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-indigo-500">Mr. Kim says</p>
-        <p className="whitespace-pre-line text-slate-800">{message}</p>
+        <MrKimMessageCard endpoint="/api/mrkim/round-complete-message" />
       </div>
 
       <div className="mb-6 rounded-xl border border-slate-200 bg-white p-4 text-left">

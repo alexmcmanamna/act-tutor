@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { getStudentIdFromCookies } from "@/lib/session";
 import { buildMasteryTable } from "@/lib/studyPlan";
 import { checkGoalRealism } from "@/lib/goalRealism";
-import { generateGoalCheckMessage } from "@/lib/mrKimMessages";
 import { GoalCheckClient } from "@/components/GoalCheckClient";
 
 // testDate is stored as a UTC-midnight Date parsed from a plain "YYYY-MM-DD"
@@ -25,11 +24,9 @@ export default async function GoalCheckPage() {
 
   const masteryTable = await buildMasteryTable(student);
   const realism = checkGoalRealism(student, masteryTable, student.studyDaysPerWeek, student.minutesPerSession);
-  const { text } = await generateGoalCheckMessage(student, realism);
 
   return (
     <GoalCheckClient
-      message={text}
       realism={realism}
       initialTestDate={student.testDate ? toDateInputValue(student.testDate) : null}
       initialStudyDaysPerWeek={student.studyDaysPerWeek}

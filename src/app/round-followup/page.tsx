@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CountUpNumber } from "@/components/CountUpNumber";
+import { MrKimMessageCard } from "@/components/MrKimMessageCard";
 
 interface FollowUpData {
   previousComposite: number | null;
@@ -19,20 +20,9 @@ function readStoredFollowUp(): FollowUpData | null {
 export default function RoundFollowUpPage() {
   const router = useRouter();
   const [data] = useState<FollowUpData | null>(readStoredFollowUp);
-  const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!data) {
-      router.replace("/dashboard");
-      return;
-    }
-    fetch("/api/mrkim/round-followup-message", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    })
-      .then((r) => r.json())
-      .then((d) => setMessage(d.text));
+    if (!data) router.replace("/dashboard");
   }, [data, router]);
 
   if (!data) return null;
@@ -67,11 +57,14 @@ export default function RoundFollowUpPage() {
 
       <div className="mb-8 rounded-2xl border border-indigo-100 bg-indigo-50 p-6 text-left">
         <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-indigo-500">Mr. Kim says</p>
-        {message ? (
-          <p className="whitespace-pre-line text-slate-800">{message}</p>
-        ) : (
-          <p className="text-sm text-slate-400">Thinking…</p>
-        )}
+        <MrKimMessageCard
+          endpoint="/api/mrkim/round-followup-message"
+          body={{
+            previousComposite: data.previousComposite,
+            newComposite: data.newComposite,
+            roundNumber: data.roundNumber,
+          }}
+        />
       </div>
 
       <button

@@ -10,30 +10,15 @@ export function MrKimInlineHelp({ initialPrompt }: { initialPrompt: string }) {
 
   async function ask(message: string) {
     setLoading(true);
-    setReply("");
     try {
       const res = await fetch("/api/mrkim/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message, history }),
       });
-
-      let accumulated = "";
-      if (res.body) {
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          accumulated += decoder.decode(value, { stream: true });
-          setReply(accumulated);
-        }
-      } else {
-        accumulated = await res.text();
-        setReply(accumulated);
-      }
-
-      setHistory((h) => [...h, { role: "user", content: message }, { role: "assistant", content: accumulated }]);
+      const data = await res.json();
+      setReply(data.reply);
+      setHistory((h) => [...h, { role: "user", content: message }, { role: "assistant", content: data.reply }]);
     } catch {
       setReply("Sorry, something went wrong reaching Mr. Kim.");
     } finally {
@@ -56,12 +41,7 @@ export function MrKimInlineHelp({ initialPrompt }: { initialPrompt: string }) {
     <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4">
       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-indigo-500">Mr. Kim</p>
       {loading && !reply && <p className="text-sm text-slate-500">Thinking…</p>}
-      {reply && (
-        <p className="whitespace-pre-line text-sm text-slate-800">
-          {reply}
-          {loading && <span className="ml-0.5 inline-block animate-pulse">▍</span>}
-        </p>
-      )}
+      {reply && <p className="whitespace-pre-line text-sm text-slate-800">{reply}</p>}
       <div className="mt-3 flex gap-2">
         <input
           value={followUp}

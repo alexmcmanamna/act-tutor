@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getStudentIdFromCookies } from "@/lib/session";
-import { generateRoundCompleteMessage } from "@/lib/mrKimMessages";
 import { RoundCompleteClient } from "@/components/RoundCompleteClient";
 
 export default async function RoundCompletePage() {
@@ -19,7 +18,5 @@ export default async function RoundCompletePage() {
   const roundComplete = roundItems.length > 0 && roundItems.every((i) => i.status === "DONE");
   if (!roundComplete) redirect("/dashboard");
 
-  const { text } = await generateRoundCompleteMessage(student, student.currentRound);
-
-  return <RoundCompleteClient message={text} roundNumber={student.currentRound} />;
+  return <RoundCompleteClient roundNumber={student.currentRound} />;
 }

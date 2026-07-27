@@ -6,12 +6,7 @@ interface OllamaChatMessage {
   content: string;
 }
 
-/**
- * Calls the local Ollama server ("Mr. Kim"'s brain). Returns null (instead of
- * throwing) if Ollama isn't running or the model isn't pulled, so callers can
- * fall back to static content and the app keeps working without Ollama.
- */
-export async function askMrKim(
+async function callOllamaOnce(
   messages: OllamaChatMessage[],
   options?: { timeoutMs?: number; maxTokens?: number; signal?: AbortSignal }
 ): Promise<string | null> {
@@ -39,9 +34,12 @@ export async function askMrKim(
         // the reasoning bleeds directly into the visible answer.
         think: true,
         // Must be generous: with think:true, num_predict caps thinking + the final
-        // answer combined, and this model's reasoning pass alone can run 150+ tokens.
-        // Too low a cap silently produces an empty answer even though the call "succeeds".
-        options: { temperature: 0.5, num_predict: options?.maxTokens ?? 400 },
+        // answer combined, and this model's reasoning pass alone can run 150-440+
+        // tokens by itself (measured, and varies run to run since temperature > 0).
+        // Too low a cap regularly leaves zero or a mid-sentence-truncated budget
+        // for the actual visible answer, which silently produced an empty/garbled
+        // reply even though the call "succeeds" — see the retry in askMrKim below.
+        options: { temperature: 0.5, num_predict: options?.maxTokens ?? 600 },
       }),
       signal: controller.signal,
     });
@@ -61,81 +59,26 @@ export async function askMrKim(
 }
 
 /**
- * Streaming variant of askMrKim: returns a ReadableStream of raw text chunks
- * (the assistant's reply, as it's generated) instead of waiting for the full
- * response. This is the main lever for perceived latency on this local
- * CPU-only setup — the student sees the first words in seconds instead of
- * waiting the full (possibly 60-170s) generation time. Returns null if Ollama
- * isn't reachable, so callers can fall back to a static message.
+ * Calls the local Ollama server ("Mr. Kim"'s brain). Returns null (instead of
+ * throwing) if Ollama isn't running or the model isn't pulled, so callers can
+ * fall back to static content and the app keeps working without Ollama.
+ *
+ * Retries once on an empty result: since sampling temperature > 0, the
+ * model's internal "thinking" length before qwen3 (a hybrid thinking model)
+ * gets around to the visible answer varies from call to call — occasionally
+ * it runs long enough to consume the entire token budget, leaving nothing
+ * for the answer. A fresh call gets a fresh (usually shorter) thinking pass,
+ * which in practice resolves this far more reliably than just raising the
+ * token budget for every call would.
  */
-export async function askMrKimStream(
+export async function askMrKim(
   messages: OllamaChatMessage[],
-  options?: { timeoutMs?: number; maxTokens?: number }
-): Promise<ReadableStream<Uint8Array> | null> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), options?.timeoutMs ?? 170000);
-
-  let res: Response;
-  try {
-    res = await fetch(`${OLLAMA_HOST}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: OLLAMA_MODEL,
-        messages,
-        stream: true,
-        // With think:true, each streamed chunk's message.content already
-        // excludes reasoning (which streams separately in message.thinking),
-        // so no <think> stripping is needed here.
-        think: true,
-        options: { temperature: 0.5, num_predict: options?.maxTokens ?? 400 },
-      }),
-      signal: controller.signal,
-    });
-  } catch {
-    clearTimeout(timeout);
-    return null;
-  }
-
-  if (!res.ok || !res.body) {
-    clearTimeout(timeout);
-    return null;
-  }
-
-  // Ollama's streaming response is newline-delimited JSON, one object per
-  // token/chunk: {"message":{"role":"assistant","content":"..."},"done":false}
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  const encoder = new TextEncoder();
-  let buffer = "";
-
-  return new ReadableStream<Uint8Array>({
-    async pull(streamController) {
-      const { done, value } = await reader.read();
-      if (done) {
-        clearTimeout(timeout);
-        streamController.close();
-        return;
-      }
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        try {
-          const parsed = JSON.parse(line);
-          const content: string | undefined = parsed?.message?.content;
-          if (content) streamController.enqueue(encoder.encode(content));
-        } catch {
-          // Ignore malformed/partial line.
-        }
-      }
-    },
-    cancel() {
-      clearTimeout(timeout);
-      reader.cancel();
-    },
-  });
+  options?: { timeoutMs?: number; maxTokens?: number; signal?: AbortSignal }
+): Promise<string | null> {
+  const first = await callOllamaOnce(messages, options);
+  if (first) return first;
+  if (options?.signal?.aborted) return null;
+  return callOllamaOnce(messages, options);
 }
 
 export async function isOllamaAvailable(): Promise<boolean> {
@@ -145,6 +88,34 @@ export async function isOllamaAvailable(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Runs a single-turn Mr. Kim prompt and returns JSON ({text, source}), used by
+ * every non-chat Mr. Kim surface (lesson coach, history explain, goal-check,
+ * round messages, ...).
+ *
+ * NOTE: this used to stream the reply via a ReadableStream Response (Next's
+ * own documented pattern for Route Handlers) to show tokens as they arrive.
+ * In this dev environment (Next.js 16.2.10 + Turbopack on Windows) that
+ * reliably hung forever — verified with curl, a raw Node fetch reader, and a
+ * real browser tab: response headers/body never reached the client even
+ * though the identical request completes fine when hitting Ollama directly.
+ * Falling back to a plain awaited JSON response, which does work reliably.
+ */
+export async function getMrKimReply(
+  userPrompt: string,
+  fallback: string,
+  options?: { maxTokens?: number; signal?: AbortSignal }
+): Promise<{ text: string; source: "ollama" | "fallback" }> {
+  const reply = await askMrKim(
+    [
+      { role: "system", content: MR_KIM_SYSTEM_PROMPT },
+      { role: "user", content: userPrompt },
+    ],
+    options
+  );
+  return reply ? { text: reply, source: "ollama" } : { text: fallback, source: "fallback" };
 }
 
 export const MR_KIM_SYSTEM_PROMPT = `You are Mr. Kim, an encouraging, knowledgeable ACT tutor AI inside a study app called "ACT Tutor." You help a student prepare for the ACT by explaining concepts clearly, giving supportive but honest feedback, and tailoring explanations to the specific question type and the student's known strengths/weaknesses.

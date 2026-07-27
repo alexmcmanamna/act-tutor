@@ -3,15 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { GoalRealismResult } from "@/lib/goalRealism";
+import { MrKimMessageCard } from "./MrKimMessageCard";
 
 export function GoalCheckClient({
-  message,
   realism,
   initialTestDate,
   initialStudyDaysPerWeek,
   initialMinutesPerSession,
 }: {
-  message: string;
   realism: GoalRealismResult;
   initialTestDate: string | null;
   initialStudyDaysPerWeek: number;
@@ -63,7 +62,7 @@ export function GoalCheckClient({
         }`}
       >
         <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Mr. Kim says</p>
-        <p className="whitespace-pre-line text-slate-800">{message}</p>
+        <MrKimMessageCard endpoint="/api/mrkim/goal-check-message" />
       </div>
 
       {!adjusting && (
