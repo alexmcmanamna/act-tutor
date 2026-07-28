@@ -4,6 +4,7 @@ import { getStudentIdFromCookies } from "@/lib/session";
 import { StartOverButton } from "./StartOverButton";
 import { PlanCalendarChip, type CalendarPlanItem } from "./PlanCalendarChip";
 import { Logo } from "./Logo";
+import { MrKimAvatar } from "./MrKimAvatar";
 
 export async function NavBar() {
   const studentId = await getStudentIdFromCookies();
@@ -53,7 +54,9 @@ export async function NavBar() {
         </Link>
 
         {student?.onboardingComplete && (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2" data-secondary-panel>
+            {/* Diagnostic/full-length/calendar chips are secondary to the core study
+                flow, so Settings > Accessibility > "Distraction-reduced layout" hides them. */}
             <Link
               href="/diagnostic"
               className={`rounded-full border px-3 py-1 text-xs font-medium ${
@@ -85,7 +88,11 @@ export async function NavBar() {
             <Link href="/history" className="hover:text-indigo-600">
               History
             </Link>
-            <Link href="/mr-kim" className="hover:text-indigo-600">
+            <Link href="/badges" className="hover:text-indigo-600">
+              Badges
+            </Link>
+            <Link href="/mr-kim" className="flex items-center gap-1.5 hover:text-indigo-600">
+              <MrKimAvatar size={20} />
               Ask Mr. Kim
             </Link>
             <Link href="/settings" className="hover:text-indigo-600">

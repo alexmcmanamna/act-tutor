@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { GoalRealismResult } from "@/lib/goalRealism";
 import { MrKimMessageCard } from "./MrKimMessageCard";
+import { MrKimBubble } from "./MrKimBubble";
 
 export function GoalCheckClient({
   realism,
@@ -56,13 +57,10 @@ export function GoalCheckClient({
         </h1>
       </div>
 
-      <div
-        className={`mb-6 rounded-2xl border p-6 text-left ${
-          realism.health === "under-capacity" ? "border-amber-200 bg-amber-50" : "border-indigo-100 bg-indigo-50"
-        }`}
-      >
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Mr. Kim says</p>
-        <MrKimMessageCard endpoint="/api/mrkim/goal-check-message" />
+      <div className="mb-6">
+        <MrKimBubble className={realism.health === "under-capacity" ? "border-amber-200 bg-amber-50" : "border-indigo-100 bg-indigo-50"}>
+          <MrKimMessageCard endpoint="/api/mrkim/goal-check-message" />
+        </MrKimBubble>
       </div>
 
       {!adjusting && (

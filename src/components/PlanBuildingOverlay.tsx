@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { MrKimAvatar } from "./MrKimAvatar";
 
 const PLAN_STATUS_MESSAGES = [
   "Mr. Kim is reviewing your diagnostic…",
@@ -36,7 +37,10 @@ export function PlanBuildingOverlay({ active, variant = "plan" }: { active: bool
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white/95 backdrop-blur-sm">
-      <div className="mb-6 h-12 w-12 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
+      <div className="relative mb-6 h-16 w-16">
+        <MrKimAvatar size={64} />
+        <div className="absolute inset-0 -m-1.5 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
+      </div>
       <p key={index} className="animate-[fade-in_0.3s_ease-in-out] text-lg font-medium text-slate-700">
         {messages[index]}
       </p>

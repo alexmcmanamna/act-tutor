@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getStudentIdFromCookies } from "@/lib/session";
 import { ReminderSettingsForm } from "@/components/ReminderSettingsForm";
+import { AccessibilitySettings } from "@/components/AccessibilitySettings";
 
 export default async function SettingsPage() {
   const studentId = await getStudentIdFromCookies();
@@ -23,6 +24,14 @@ export default async function SettingsPage() {
           reminderTime: student.reminderTime,
         }}
       />
+
+      <div className="mt-10">
+        <h2 className="mb-1 text-lg font-bold text-slate-900">Accessibility</h2>
+        <p className="mb-4 text-sm text-slate-600">
+          These preferences are saved on this device and apply across the whole app immediately.
+        </p>
+        <AccessibilitySettings />
+      </div>
     </div>
   );
 }

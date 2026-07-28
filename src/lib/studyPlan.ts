@@ -247,10 +247,10 @@ Write a short (3-4 sentence), encouraging study plan overview addressed directly
   if (aiResponse) return aiResponse;
 
   if (isFoundationRound) {
-    return `Welcome! We'll start with round 1: a foundational lesson on every ACT question type across English, Math, Reading, and Science, sequenced so your weakest areas — ${weakList} — come first. Once you're through this round, we'll check your progress and target round 2 at exactly what you still need. (Note: Mr. Kim's AI commentary is using a fallback message right now because the local Ollama server wasn't reachable — your plan itself is still fully personalized to your data.)`;
+    return `Welcome! Round 1 covers every ACT question type, starting with your weakest areas — ${weakList}. Once you're through it, we'll check your progress and target round 2 at what you still need.`;
   }
 
-  return `Welcome back! Based on your latest results, I've built a plan to help you close the gap to your goal score of ${student.goalScore}${
+  return `Welcome back! I've built a plan to close the gap to your goal of ${student.goalScore}${
     weeks ? ` before your test in about ${weeks} week${weeks === 1 ? "" : "s"}` : ""
-  }. We'll start with your weakest areas — ${weakList} — pairing a short lesson with targeted practice for each, then keep adapting as you go. (Note: Mr. Kim's AI commentary is using a fallback message right now because the local Ollama server wasn't reachable — your plan itself is still fully personalized to your data.)`;
+  }, starting with your weakest areas — ${weakList}.`;
 }

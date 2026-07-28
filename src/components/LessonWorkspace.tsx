@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { LessonStageContent } from "@/lib/lessonContent";
 import { PracticeSession } from "./PracticeSession";
+import { MrKimBubble } from "./MrKimBubble";
 
 const STAGES = [
   { key: "learn", label: "Learn" },
@@ -40,9 +41,10 @@ function CoachBubble({ section, subtopic, stage }: { section: string; subtopic: 
   }, [section, subtopic, stage]);
 
   return (
-    <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
-      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-indigo-500">Mr. Kim</p>
-      {text ? <p className="text-sm text-slate-800">{text}</p> : <p className="text-sm text-slate-400">Thinking…</p>}
+    <div className="mt-4">
+      <MrKimBubble className="border-indigo-100 bg-indigo-50/60" label="Mr. Kim" text={text ?? undefined}>
+        {text ? <p className="text-sm text-slate-800">{text}</p> : <p className="text-sm text-slate-400">Thinking…</p>}
+      </MrKimBubble>
     </div>
   );
 }

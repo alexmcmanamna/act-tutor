@@ -4,6 +4,7 @@ import { getStudentIdFromCookies } from "@/lib/session";
 import { buildMasteryTable } from "@/lib/studyPlan";
 import { SECTIONS, SUBTOPICS, sectionLabel, subtopicLabel } from "@/data/subtopics";
 import { SkillRadar } from "@/components/SkillRadar";
+import { projectedScoreGain } from "@/lib/gamification";
 
 const SECTION_COLORS: Record<string, string> = {
   ENGLISH: "#4f46e5",
@@ -35,6 +36,10 @@ export default async function ProgressPage() {
         <h1 className="text-2xl font-bold text-slate-900">See how your skills are developing.</h1>
         <p className="mt-2 text-sm text-slate-500">
           Study estimates built from your diagnostic and practice answers — not official ACT scores.
+        </p>
+        <p className="mt-2 text-sm font-medium text-indigo-600">
+          ⭐ {student.points} points earned ≈ +{projectedScoreGain(student.points)} ACT composite points (1,000 pts ≈ 1 pt) — the
+          same rate shown on your dashboard, tracking the mastery gains in the polygons below.
         </p>
       </div>
 

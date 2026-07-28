@@ -2,12 +2,27 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ClientQuestion } from "@/types";
-import { playCorrectSound } from "@/lib/sounds";
+import { playCorrectSound, playWrongSound } from "@/lib/sounds";
 
 interface Feedback {
   correctIndex: number;
   explanation: string;
   correct: boolean;
+}
+
+function DifficultyBadge({ difficulty }: { difficulty: number }) {
+  const tier =
+    difficulty <= 2
+      ? { label: "Easy", className: "border-green-200 bg-green-50 text-green-700" }
+      : difficulty === 3
+        ? { label: "Medium", className: "border-amber-200 bg-amber-50 text-amber-700" }
+        : { label: "Hard", className: "border-red-200 bg-red-50 text-red-700" };
+
+  return (
+    <span className={`mb-3 inline-block rounded-full border px-2.5 py-0.5 text-xs font-semibold ${tier.className}`}>
+      {tier.label}
+    </span>
+  );
 }
 
 interface QuestionCardProps {
@@ -37,9 +52,10 @@ export function QuestionCard({
   const effectiveSelected = showFeedback ? selectedIndex ?? null : localSelected;
 
   useEffect(() => {
-    if (showFeedback && feedback?.correct && playedForRef.current !== question.id) {
+    if (showFeedback && feedback && playedForRef.current !== question.id) {
       playedForRef.current = question.id;
-      playCorrectSound();
+      if (feedback.correct) playCorrectSound();
+      else playWrongSound();
     }
   }, [showFeedback, feedback, question.id]);
 
@@ -60,6 +76,9 @@ export function QuestionCard({
           {question.passage}
         </div>
       )}
+      {/* Difficulty tags only make sense on practice/learning checks (showFeedback=true).
+          Diagnostics and full-length tests intentionally omit them to mirror real ACT conditions. */}
+      {showFeedback && <DifficultyBadge difficulty={question.difficulty} />}
       <p className="mb-4 text-lg font-medium text-slate-900">{question.prompt}</p>
       <div className="space-y-2">
         {question.choices.map((choice, i) => {

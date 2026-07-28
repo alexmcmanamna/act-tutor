@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { MrKimMessageCard } from "./MrKimMessageCard";
+import { MrKimBubble } from "./MrKimBubble";
 
 export function RoundCompleteClient({ roundNumber }: { roundNumber: number }) {
   const router = useRouter();
@@ -32,9 +33,10 @@ export function RoundCompleteClient({ roundNumber }: { roundNumber: number }) {
       <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-indigo-500">Round {roundNumber} complete</p>
       <h1 className="mb-6 text-2xl font-bold text-slate-900">Time to check your progress</h1>
 
-      <div className="mb-6 rounded-2xl border border-indigo-100 bg-indigo-50 p-6 text-left">
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-indigo-500">Mr. Kim says</p>
-        <MrKimMessageCard endpoint="/api/mrkim/round-complete-message" />
+      <div className="mb-6">
+        <MrKimBubble>
+          <MrKimMessageCard endpoint="/api/mrkim/round-complete-message" />
+        </MrKimBubble>
       </div>
 
       <div className="mb-6 rounded-xl border border-slate-200 bg-white p-4 text-left">

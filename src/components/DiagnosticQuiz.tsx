@@ -6,6 +6,8 @@ import type { ClientQuestion } from "@/types";
 import { sectionLabel, subtopicLabel } from "@/data/subtopics";
 import { QuestionCard } from "./QuestionCard";
 import { PlanBuildingOverlay } from "./PlanBuildingOverlay";
+import { CountdownTimer, timerBudgetSeconds } from "./CountdownTimer";
+import { playSetCompleteSound } from "@/lib/sounds";
 
 interface DiagnosticQuizProps {
   /** When set, this is a shorter recalibration diagnostic (after finishing all assigned lessons), not the initial onboarding one. */
@@ -31,6 +33,10 @@ export function DiagnosticQuiz({ mode = "initial" }: DiagnosticQuizProps) {
       .then((data) => setQuestions(data.questions))
       .catch(() => setError("Couldn't load the diagnostic. Try refreshing."));
   }, []);
+
+  useEffect(() => {
+    if (done && summary) playSetCompleteSound();
+  }, [done, summary]);
 
   if (error) return <p className="text-red-600">{error}</p>;
   if (!questions) return <p className="text-slate-500">Loading your diagnostic…</p>;
@@ -137,9 +143,16 @@ export function DiagnosticQuiz({ mode = "initial" }: DiagnosticQuizProps) {
           <span>
             Question {index + 1} of {questions.length}
           </span>
-          <span>
-            {sectionLabel(current.section)} · {subtopicLabel(current.section, current.subtopic)}
-          </span>
+          <div className="flex items-center gap-3">
+            <span>
+              {sectionLabel(current.section)} · {subtopicLabel(current.section, current.subtopic)}
+            </span>
+            <CountdownTimer
+              totalSeconds={timerBudgetSeconds(questions.map((q) => q.section))}
+              onExpire={() => submitAll(answers)}
+              paused={submitting}
+            />
+          </div>
         </div>
         <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
           <div className="h-full rounded-full bg-indigo-600 transition-all" style={{ width: `${progress}%` }} />

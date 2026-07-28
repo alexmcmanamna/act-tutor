@@ -11,7 +11,7 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const section = searchParams.get("section") as Section | null;
   const subtopic = searchParams.get("subtopic");
-  const limit = Math.min(10, Number(searchParams.get("limit") ?? 5));
+  const limit = Math.min(15, Number(searchParams.get("limit") ?? 5));
 
   if (!section || !subtopic) {
     return NextResponse.json({ error: "section and subtopic query params are required." }, { status: 400 });

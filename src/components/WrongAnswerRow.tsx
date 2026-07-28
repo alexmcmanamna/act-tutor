@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { MrKimAvatar } from "./MrKimAvatar";
 
 export interface WrongAnswerData {
   attemptId: string;
@@ -43,9 +44,12 @@ export function WrongAnswerRow({ data }: { data: WrongAnswerData }) {
       </p>
 
       {explanation ? (
-        <div className="mt-2 rounded-lg bg-white p-2.5 text-xs text-slate-700">
-          <p className="mb-1 font-semibold uppercase tracking-wide text-indigo-500">Mr. Kim explains</p>
-          <p className="whitespace-pre-line">{explanation}</p>
+        <div className="mt-2 flex gap-2 rounded-lg bg-white p-2.5 text-xs text-slate-700">
+          <MrKimAvatar size={22} />
+          <div className="min-w-0 flex-1">
+            <p className="mb-1 font-semibold uppercase tracking-wide text-indigo-500">Mr. Kim explains</p>
+            <p className="whitespace-pre-line">{explanation}</p>
+          </div>
         </div>
       ) : (
         <button

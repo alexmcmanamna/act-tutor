@@ -4,10 +4,12 @@ import { prisma } from "@/lib/prisma";
 import { getStudentIdFromCookies } from "@/lib/session";
 import { buildMasteryTable, weeksUntil } from "@/lib/studyPlan";
 import { isDueNow } from "@/lib/calendar";
-import { getDailyGoal, computeBadges } from "@/lib/gamification";
+import { getDailyGoal, computeBadges, projectedScoreGain, levelForPoints } from "@/lib/gamification";
 import { MasteryOverview } from "@/components/MasteryOverview";
 import { PlanItemList } from "@/components/PlanItemList";
 import { RegeneratePlanButton } from "@/components/RegeneratePlanButton";
+import { MrKimBubble } from "@/components/MrKimBubble";
+import { LevelBadge } from "@/components/LevelBadge";
 
 export default async function DashboardPage() {
   const studentId = await getStudentIdFromCookies();
@@ -22,16 +24,18 @@ export default async function DashboardPage() {
     include: { items: { orderBy: { order: "asc" } } },
   });
 
-  const [masteryTable, dailyGoal, totalAttempts] = await Promise.all([
+  const [masteryTable, dailyGoal, totalAttempts, testAttempts] = await Promise.all([
     buildMasteryTable(student),
     getDailyGoal(studentId),
     prisma.questionAttempt.count({ where: { studentId } }),
+    prisma.testAttempt.findMany({ where: { studentId }, orderBy: { createdAt: "asc" }, select: { composite: true } }),
   ]);
+  const composites = testAttempts.map((t) => t.composite).filter((c): c is number => c != null);
 
   const weeksAway = weeksUntil(student.testDate);
   const roundItems = plan?.items.filter((i) => i.round === student.currentRound) ?? [];
   const roundFullyDone = roundItems.length > 0 && roundItems.every((i) => i.status === "DONE");
-  const badges = computeBadges(student, totalAttempts).filter((b) => b.earned);
+  const badges = computeBadges(student, totalAttempts, masteryTable, composites).filter((b) => b.earned);
 
   const assessmentDue = !!student.roundAssessmentType && isDueNow(student.roundAssessmentScheduledFor);
 
@@ -78,13 +82,19 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div
+          className={`rounded-xl border p-4 ${
+            dailyGoal.total > 0 && dailyGoal.done >= dailyGoal.total ? "border-green-300 bg-green-50" : "border-slate-200 bg-white"
+          }`}
+        >
           <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Today&apos;s goal</p>
           <p className="mt-1 text-2xl font-bold text-slate-900">
             {dailyGoal.done}/{dailyGoal.total || 0}
           </p>
-          <p className="text-xs text-slate-500">items done today</p>
+          <p className="text-xs text-slate-500">
+            {dailyGoal.total > 0 && dailyGoal.done >= dailyGoal.total ? "Goal crushed today! 🎉" : "items done today"}
+          </p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Streak</p>
@@ -96,30 +106,31 @@ export default async function DashboardPage() {
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Points</p>
           <p className="mt-1 text-2xl font-bold text-slate-900">⭐ {student.points}</p>
-          <p className="text-xs text-slate-500">
-            {badges.length > 0 ? `${badges.length} badge${badges.length === 1 ? "" : "s"} earned` : "answer questions to earn badges"}
-          </p>
+          <p className="text-xs text-slate-500">≈ +{projectedScoreGain(student.points)} ACT pts so far (1,000 pts ≈ 1 pt)</p>
         </div>
+        <LevelBadge level={levelForPoints(student.points)} />
       </div>
 
-      {badges.length > 0 && (
-        <div className="mb-8 flex flex-wrap gap-2">
-          {badges.map((b) => (
-            <span
-              key={b.key}
-              title={b.description}
-              className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800"
-            >
-              🏅 {b.label}
-            </span>
-          ))}
-        </div>
-      )}
+      <div className="mb-8 flex flex-wrap items-center gap-2">
+        {badges.slice(0, 6).map((b) => (
+          <span
+            key={b.key}
+            title={b.description}
+            className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800"
+          >
+            🏅 {b.label}
+          </span>
+        ))}
+        <Link href="/badges" className="text-xs font-medium text-indigo-600 hover:underline">
+          {badges.length > 0 ? "See all badges →" : "See badges to earn →"}
+        </Link>
+      </div>
 
       {plan && (
-        <div className="mb-8 rounded-2xl border border-indigo-100 bg-indigo-50 p-5">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-indigo-500">Mr. Kim says</p>
-          <p className="text-slate-800">{plan.summary}</p>
+        <div className="mb-8">
+          <MrKimBubble text={plan.summary}>
+            <p className="text-slate-800">{plan.summary}</p>
+          </MrKimBubble>
         </div>
       )}
 

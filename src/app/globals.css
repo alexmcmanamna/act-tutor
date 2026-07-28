@@ -27,3 +27,56 @@ body {
 .mastery-bar-track {
   background: #e2e8f0;
 }
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Settings > Accessibility accommodations (see src/lib/accessibility.ts).
+   Applied via data-a11y-* attributes on <html>, set both by an inline
+   pre-hydration script (layout.tsx) and live by AccessibilitySettings.tsx. */
+
+/* Reduced motion: independent of the OS-level prefers-reduced-motion, which
+   Tailwind's motion-safe: variant already respects on its own. */
+html[data-a11y-motion="reduced"] *,
+html[data-a11y-motion="reduced"] *::before,
+html[data-a11y-motion="reduced"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+html[data-a11y-text="large"] {
+  font-size: 112.5%;
+}
+
+html[data-a11y-contrast="high"] {
+  --background: #ffffff;
+  --foreground: #000000;
+}
+html[data-a11y-contrast="high"] .border-slate-200,
+html[data-a11y-contrast="high"] .border-slate-300 {
+  border-color: #1e293b !important;
+}
+html[data-a11y-contrast="high"] .text-slate-400,
+html[data-a11y-contrast="high"] .text-slate-500 {
+  color: #334155 !important;
+}
+
+html[data-a11y-keyboard="strong"] :focus-visible {
+  outline: 4px solid #4f46e5 !important;
+  outline-offset: 3px !important;
+}
+
+/* Distraction-reduced layout: hides chips/panels marked secondary. */
+html[data-a11y-distraction="reduced"] [data-secondary-panel] {
+  display: none !important;
+}

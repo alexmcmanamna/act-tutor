@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import type { ClientQuestion } from "@/types";
 import { QuestionCard } from "./QuestionCard";
 import { MrKimInlineHelp } from "./MrKimInlineHelp";
+import { CountdownTimer, timerBudgetSeconds } from "./CountdownTimer";
+import { playSetCompleteSound } from "@/lib/sounds";
 
 interface Feedback {
   correctIndex: number;
@@ -34,6 +36,29 @@ export function PracticeSession({ section, subtopic, planItemId }: PracticeSessi
   );
 }
 
+function SetCompleteCard({ correctCount, total, onRestart }: { correctCount: number; total: number; onRestart: () => void }) {
+  useEffect(() => {
+    playSetCompleteSound();
+  }, []);
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+      <h2 className="text-xl font-bold text-slate-900">Set complete!</h2>
+      <p className="mt-2 text-slate-600">
+        You got <span className="font-semibold text-indigo-600">{correctCount}</span> of {total} correct.
+      </p>
+      <div className="mt-6 flex justify-center gap-3">
+        <button onClick={onRestart} className="rounded-lg border border-slate-300 px-5 py-2.5 font-medium text-slate-600">
+          Practice again
+        </button>
+        <Link href="/dashboard" className="rounded-lg bg-indigo-600 px-5 py-2.5 font-medium text-white">
+          Back to dashboard
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 function PracticeSessionInner({
   section,
   subtopic,
@@ -51,7 +76,11 @@ function PracticeSessionInner({
   const [sessionId] = useState(() => crypto.randomUUID());
 
   useEffect(() => {
-    fetch(`/api/practice/questions?section=${section}&subtopic=${subtopic}&limit=5`)
+    // Pulls up to a full ACT-section-style set (rather than a token 5
+    // questions) so a progress check gives real reps of stamina/pacing —
+    // the actual count returned is capped by how many questions exist for
+    // this subtopic in the bank.
+    fetch(`/api/practice/questions?section=${section}&subtopic=${subtopic}&limit=12`)
       .then((r) => r.json())
       .then((data) => setQuestions(data.questions));
   }, [section, subtopic]);
@@ -60,22 +89,7 @@ function PracticeSessionInner({
   if (questions.length === 0) return <p className="text-slate-500">No practice questions available for this topic yet.</p>;
 
   if (finished) {
-    return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-        <h2 className="text-xl font-bold text-slate-900">Set complete!</h2>
-        <p className="mt-2 text-slate-600">
-          You got <span className="font-semibold text-indigo-600">{correctCount}</span> of {questions.length} correct.
-        </p>
-        <div className="mt-6 flex justify-center gap-3">
-          <button onClick={onRestart} className="rounded-lg border border-slate-300 px-5 py-2.5 font-medium text-slate-600">
-            Practice again
-          </button>
-          <Link href="/dashboard" className="rounded-lg bg-indigo-600 px-5 py-2.5 font-medium text-white">
-            Back to dashboard
-          </Link>
-        </div>
-      </div>
-    );
+    return <SetCompleteCard correctCount={correctCount} total={questions.length} onRestart={onRestart} />;
   }
 
   const current = questions[index];
@@ -119,13 +133,14 @@ function PracticeSessionInner({
 
   return (
     <div>
-      <div className="mb-4 flex justify-between text-sm text-slate-500">
+      <div className="mb-4 flex items-center justify-between text-sm text-slate-500">
         <span>
           Question {index + 1} of {questions.length}
         </span>
-        <span>
-          {correctCount} correct so far
-        </span>
+        <div className="flex items-center gap-3">
+          <span>{correctCount} correct so far</span>
+          <CountdownTimer totalSeconds={timerBudgetSeconds(questions.map((q) => q.section))} onExpire={() => setFinished(true)} />
+        </div>
       </div>
 
       <QuestionCard

@@ -6,7 +6,7 @@ import { buildMasteryTable } from "@/lib/studyPlan";
 import { sectionLabel, subtopicLabel } from "@/data/subtopics";
 
 const UNREACHABLE_FALLBACK =
-  "I can't reach my local Ollama brain right now (make sure `ollama serve` is running and the model is pulled), but here's a quick tip: focus your next practice session on your lowest-mastery subtopic on the dashboard — that's where you'll gain the most points.";
+  "I can't quite think right now — try asking again in a moment, or focus your next practice session on your lowest-mastery subtopic on the dashboard.";
 
 interface ChatBody {
   message: string;

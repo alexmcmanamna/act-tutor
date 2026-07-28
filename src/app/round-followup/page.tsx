@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CountUpNumber } from "@/components/CountUpNumber";
 import { MrKimMessageCard } from "@/components/MrKimMessageCard";
+import { MrKimBubble } from "@/components/MrKimBubble";
 
 interface FollowUpData {
   previousComposite: number | null;
@@ -55,16 +56,17 @@ export default function RoundFollowUpPage() {
         </div>
       </div>
 
-      <div className="mb-8 rounded-2xl border border-indigo-100 bg-indigo-50 p-6 text-left">
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-indigo-500">Mr. Kim says</p>
-        <MrKimMessageCard
-          endpoint="/api/mrkim/round-followup-message"
-          body={{
-            previousComposite: data.previousComposite,
-            newComposite: data.newComposite,
-            roundNumber: data.roundNumber,
-          }}
-        />
+      <div className="mb-8">
+        <MrKimBubble>
+          <MrKimMessageCard
+            endpoint="/api/mrkim/round-followup-message"
+            body={{
+              previousComposite: data.previousComposite,
+              newComposite: data.newComposite,
+              roundNumber: data.roundNumber,
+            }}
+          />
+        </MrKimBubble>
       </div>
 
       <button

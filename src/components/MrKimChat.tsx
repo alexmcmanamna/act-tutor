@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { MrKimAvatar } from "./MrKimAvatar";
 
 interface Message {
   role: "user" | "assistant";
@@ -46,9 +47,14 @@ export function MrKimChat() {
 
   return (
     <div className="flex h-[70vh] flex-col rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-3">
+        <MrKimAvatar size={28} />
+        <p className="text-sm font-semibold text-slate-700">Mr. Kim</p>
+      </div>
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
         {messages.map((m, i) => (
-          <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+          <div key={i} className={`flex items-end gap-2 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+            {m.role === "assistant" && <MrKimAvatar size={24} />}
             <div
               className={`max-w-[80%] whitespace-pre-line rounded-2xl px-4 py-2 text-sm ${
                 m.role === "user" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-800"
@@ -59,7 +65,8 @@ export function MrKimChat() {
           </div>
         ))}
         {loading && (
-          <div className="flex justify-start">
+          <div className="flex items-end justify-start gap-2">
+            <MrKimAvatar size={24} />
             <div className="max-w-[80%] rounded-2xl bg-slate-100 px-4 py-2 text-sm text-slate-400">Thinking…</div>
           </div>
         )}
